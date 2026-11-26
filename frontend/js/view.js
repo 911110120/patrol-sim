@@ -58,6 +58,9 @@ const View = (() => {
     progress.dataset.complete = String(state.patrol.completed);
 
     drawGrid(state);
+
+    document.querySelector("#map-placeholder").hidden = true;
+    document.querySelector("#map-board").hidden = false;
   }
 
   function drawGrid(state) {
