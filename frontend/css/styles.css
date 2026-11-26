@@ -234,6 +234,20 @@ main {
 }
 .sensor-panel p { margin: 0; font-size: 14px; color: #cfeaf0; }
 
+/* 运行统计 */
+.stats-panel {
+  border: 1px dashed rgba(167, 139, 250, 0.4);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  background: rgba(167, 139, 250, 0.06);
+}
+.stats-panel h3 { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+.stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.stats-grid div { background: rgba(0, 0, 0, 0.18); border-radius: 10px; padding: 8px 10px; }
+.stats-grid dt { color: var(--muted); font-size: 12px; }
+.stats-grid dd { margin: 2px 0 0; font-weight: 700; font-size: 16px; }
+
 /* 方向舵盘 */
 .direction-pad {
   display: grid;
@@ -302,7 +316,26 @@ main {
 }
 #patrol-start:not(:disabled):hover { box-shadow: var(--glow-cyan); }
 #patrol-stop:not(:disabled) { border-color: rgba(255, 194, 75, 0.4); color: var(--checkpoint); }
+#return-home:not(:disabled) { border-color: rgba(46, 197, 211, 0.4); color: var(--visited); }
 #reset:not(:disabled) { border-color: rgba(167, 139, 250, 0.4); color: var(--path); }
+
+.modes { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+.mode-toggle {
+  border: 1px solid var(--panel-line);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 8px 13px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+.mode-toggle.active {
+  background: linear-gradient(135deg, #a78bfa, #7c5cd6);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 0 16px rgba(167, 139, 250, 0.35);
+}
 
 .patrol-progress {
   margin: 12px 0;

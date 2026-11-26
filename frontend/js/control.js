@@ -11,12 +11,20 @@ const Control = (() => {
     });
     document.querySelector("#patrol-start").addEventListener("click", handlers.patrolStart);
     document.querySelector("#patrol-stop").addEventListener("click", handlers.patrolStop);
+    document.querySelector("#return-home").addEventListener("click", handlers.returnHome);
     document.querySelector("#reset").addEventListener("click", handlers.reset);
     document.querySelector("#reload").addEventListener("click", handlers.reload);
+    document.querySelector("#edit-mode").addEventListener("click", handlers.toggleEditMode);
+    document.querySelector("#dynamic-mode").addEventListener("click", handlers.toggleDynamic);
 
     document.querySelector("#map").addEventListener("click", (event) => {
       const cell = event.target.closest(".cell");
-      if (cell) handlers.pickTarget(Number(cell.dataset.x), Number(cell.dataset.y));
+      if (!cell) return;
+      const x = Number(cell.dataset.x);
+      const y = Number(cell.dataset.y);
+      const editActive = document.querySelector("#edit-mode").dataset.active === "true";
+      if (editActive) handlers.toggleObstacle(x, y);
+      else handlers.pickTarget(x, y);
     });
 
     document.addEventListener("keydown", (event) => {

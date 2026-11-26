@@ -89,3 +89,35 @@ def test_reset():
 def test_unknown_api_path_returns_404():
     response = client.get("/api/does-not-exist")
     assert response.status_code == 404
+
+
+def test_return_home_endpoint():
+    response = client.post("/api/return-home")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["patrol"]["active"] is True
+    assert body["patrol"]["returning"] is True
+
+
+def test_toggle_obstacle_adds_and_removes():
+    first = client.post("/api/map/toggle", json={"x": 5, "y": 5})
+    assert first.status_code == 200
+    obstacles = {(o["x"], o["y"]) for o in first.json()["map"]["obstacles"]}
+    assert (5, 5) in obstacles
+    second = client.post("/api/map/toggle", json={"x": 5, "y": 5})
+    assert second.status_code == 200
+    obstacles2 = {(o["x"], o["y"]) for o in second.json()["map"]["obstacles"]}
+    assert (5, 5) not in obstacles2
+
+
+def test_toggle_obstacle_protected_cell_rejected():
+    response = client.post("/api/map/toggle", json={"x": 0, "y": 0})
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "invalid_request"
+
+
+def test_dynamic_obstacle_switch():
+    on = client.post("/api/map/dynamic", json={"enabled": True})
+    assert on.status_code == 200
+    off = client.post("/api/map/dynamic", json={"enabled": False})
+    assert off.status_code == 200

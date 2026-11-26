@@ -13,6 +13,7 @@
     });
     $("#patrol-start").disabled = disabled;
     $("#patrol-stop").disabled = disabled;
+    $("#return-home").disabled = disabled;
     $("#reset").disabled = disabled;
     $("#reload").disabled = disabled;
   }
@@ -131,6 +132,68 @@
     }
   }
 
+  async function returnHome() {
+    if (busy || View.getState() === null) return;
+    setBusy(true);
+    showStatus("正在返航…", "pending");
+    try {
+      const state = await API.requestJSON("/api/return-home", { method: "POST" });
+      View.render(state);
+      showStatus("已下发返航指令，机器人正在返回起点。");
+      schedulePoll();
+    } catch (error) {
+      showStatus(error.message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleObstacle(x, y) {
+    if (busy || View.getState() === null) return;
+    setBusy(true);
+    try {
+      const state = await API.requestJSON("/api/map/toggle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ x, y }),
+      });
+      View.render(state);
+      showStatus(`已切换 (${x}, ${y}) 的障碍状态。`);
+    } catch (error) {
+      showStatus(error.message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleDynamic() {
+    if (busy) return;
+    const btn = $("#dynamic-mode");
+    const next = btn.dataset.active !== "true";
+    btn.dataset.active = String(next);
+    btn.setAttribute("aria-pressed", String(next));
+    btn.classList.toggle("active", next);
+    try {
+      await API.requestJSON("/api/map/dynamic", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: next }),
+      });
+      showStatus(next ? "动态障碍已开启，障碍会随机移动。" : "动态障碍已关闭。");
+    } catch (error) {
+      showStatus(error.message, "error");
+    }
+  }
+
+  function toggleEditMode() {
+    const btn = $("#edit-mode");
+    const next = btn.dataset.active !== "true";
+    btn.dataset.active = String(next);
+    btn.setAttribute("aria-pressed", String(next));
+    btn.classList.toggle("active", next);
+    showStatus(next ? "编辑模式：点击格子放置/移除障碍。" : "规划模式：点击空地查询路径。");
+  }
+
   function schedulePoll() {
     clearTimeout(pollTimer);
     pollTimer = setTimeout(() => {
@@ -159,9 +222,13 @@
     move,
     patrolStart,
     patrolStop,
+    returnHome,
     reset: resetSim,
     reload: loadState,
     pickTarget: planTo,
+    toggleObstacle,
+    toggleEditMode,
+    toggleDynamic,
   });
 
   loadState();

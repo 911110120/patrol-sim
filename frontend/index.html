@@ -36,7 +36,7 @@
               <div id="map" class="map" role="grid" aria-label="巡检地图"></div>
             </div>
           </div>
-          <p class="map-note">左上角为 (0, 0)，向右 x 增大，向下 y 增大。点击任意空地可查询到该点的规划路径。</p>
+          <p class="map-note">左上角为 (0, 0)，向右 x 增大，向下 y 增大。默认点击空地查询规划路径；开启「编辑障碍」后点击格子可放置或移除障碍。</p>
         </section>
 
         <aside class="controls" aria-labelledby="control-title">
@@ -56,6 +56,16 @@
             <p id="sensor-reading">尚未读取</p>
           </div>
 
+          <div class="stats-panel" aria-label="运行统计">
+            <h3>运行统计</h3>
+            <div class="stats-grid">
+              <div><dt>移动步数</dt><dd id="stat-steps">0</dd></div>
+              <div><dt>路径长度</dt><dd id="stat-path">0</dd></div>
+              <div><dt>运行耗时</dt><dd id="stat-elapsed">0.0s</dd></div>
+              <div><dt>巡检覆盖率</dt><dd id="stat-coverage">0%</dd></div>
+            </div>
+          </div>
+
           <div class="direction-pad" aria-label="移动方向">
             <button type="button" data-direction="up" class="up" aria-label="向上移动一格" disabled>上</button>
             <button type="button" data-direction="left" class="left" aria-label="向左移动一格" disabled>左</button>
@@ -67,7 +77,13 @@
           <div class="actions">
             <button id="patrol-start" type="button" class="action" disabled>启动自动巡检</button>
             <button id="patrol-stop" type="button" class="action" disabled>停止巡检</button>
+            <button id="return-home" type="button" class="action" disabled>返航回起点</button>
             <button id="reset" type="button" class="action" disabled>复位机器人</button>
+          </div>
+
+          <div class="modes">
+            <button id="edit-mode" type="button" class="mode-toggle" aria-pressed="false">编辑障碍</button>
+            <button id="dynamic-mode" type="button" class="mode-toggle" aria-pressed="false">动态障碍</button>
           </div>
 
           <p id="patrol-progress" class="patrol-progress" role="status" aria-live="polite">检查点尚未读取</p>

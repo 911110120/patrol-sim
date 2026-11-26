@@ -4,6 +4,7 @@
 后台巡检线程与接口请求通过同一把锁串行访问内部数据。
 """
 
+import random
 import threading
 import time
 
@@ -32,7 +33,12 @@ def _direction_between(a: Position, b: Position) -> str:
 class Simulator:
     """同一服务实例共享一个机器人状态，不按浏览器划分会话。"""
 
-    def __init__(self, world: World | None = None, tick_seconds: float = 0.3) -> None:
+    def __init__(
+        self,
+        world: World | None = None,
+        tick_seconds: float = 0.3,
+        dynamic_obstacles: bool = False,
+    ) -> None:
         self._world = world or default_world()
         self._lock = threading.Lock()
         self._robot_pos = self._world.start
@@ -44,6 +50,15 @@ class Simulator:
         self._patrol_path: list[Position] = []
         self._patrol_target: Position | None = None
         self._patrol_message = ""
+        self._returning = False
+
+        # 运行统计：手动/巡检移动的步数、累计规划路径长度、起步时间。
+        self._steps = 0
+        self._path_length = 0
+        self._started_at: float | None = None
+
+        self._dynamic_obstacles = dynamic_obstacles
+        self._obstacle_tick = 0
 
         self._stop_event = threading.Event()
         self._tick = tick_seconds
@@ -77,8 +92,26 @@ class Simulator:
                 "visited": [p.as_dict() for p in self._visited],
                 "target": self._patrol_target.as_dict() if self._patrol_target else None,
                 "message": self._patrol_message,
+                "returning": self._returning,
+            },
+            "stats": {
+                "steps": self._steps,
+                "pathLength": self._path_length,
+                "elapsed": self._elapsed_seconds(),
+                "coverage": self._coverage(),
             },
         }
+
+    def _elapsed_seconds(self) -> float:
+        if self._started_at is None:
+            return 0.0
+        return round(time.time() - self._started_at, 1)
+
+    def _coverage(self) -> float:
+        total = len(self._world.checkpoints)
+        if total == 0:
+            return 1.0
+        return round(len(self._visited) / total, 2)
 
     # ---------- 手动控制 ----------
 
@@ -105,6 +138,8 @@ class Simulator:
             self._robot_dir = direction
             self._robot_status = "idle"
             self._record_checkpoint(target)
+            self._steps += 1
+            self._touch_clock()
             # 手动操作视为人工接管，终止正在进行的自动巡检。
             self._stop_patrol_locked()
             return self._snapshot()
@@ -120,7 +155,12 @@ class Simulator:
             path = planner.plan(self._world, start, goal)
             if path is None:
                 return {"ok": False, "path": [], "reason": "目标点不可达，中间被边界或障碍物隔开"}
+            self._path_length += len(path)
             return {"ok": True, "path": [p.as_dict() for p in path], "reason": ""}
+
+    def _touch_clock(self) -> None:
+        if self._started_at is None:
+            self._started_at = time.time()
 
     # ---------- 自动巡检 ----------
 
@@ -133,6 +173,7 @@ class Simulator:
             self._patrol_completed = False
             self._patrol_path = []
             self._patrol_target = None
+            self._returning = False
             self._patrol_active = True
             self._patrol_message = "正在按顺序前往检查点…"
             self._robot_status = "moving"
@@ -145,6 +186,35 @@ class Simulator:
             self._patrol_message = "巡检已手动停止"
             return self._snapshot()
 
+    def return_home(self) -> dict:
+        """手动返航：结束当前巡检，规划并行进回起点。"""
+        with self._lock:
+            self._stop_patrol_locked()
+            self._returning = True
+            self._patrol_active = True
+            self._robot_status = "moving"
+            self._patrol_message = "正在返航返回起点…"
+            return self._snapshot()
+
+    def toggle_obstacle(self, x: int, y: int) -> dict:
+        """在指定格放置或移除障碍；受保护格（起点/检查点/机器人）不允许改动。"""
+        point = Position(x, y)
+        if not self._world.in_bounds(point):
+            raise SimError("out_of_bounds", "该格在地图范围之外，不能编辑", 409)
+        if point == self._world.start:
+            raise SimError("invalid_request", "起点不能放置障碍物", 400)
+        if point in self._world.checkpoints:
+            raise SimError("invalid_request", "检查点不能放置障碍物", 400)
+        if point == self._robot_pos:
+            raise SimError("invalid_request", "机器人所在格不能放置障碍物", 400)
+        added = self._world.toggle_obstacle(point)
+        self._patrol_path = []
+        return self._snapshot()
+
+    def set_dynamic_obstacles(self, enabled: bool) -> dict:
+        self._dynamic_obstacles = enabled
+        return self.state()
+
     def reset(self) -> dict:
         with self._lock:
             self._robot_pos = self._world.start
@@ -153,6 +223,9 @@ class Simulator:
             self._visited = []
             self._stop_patrol_locked()
             self._patrol_completed = False
+            self._steps = 0
+            self._path_length = 0
+            self._started_at = None
             self._patrol_message = "已复位到初始位置"
             return self._snapshot()
 
@@ -162,34 +235,85 @@ class Simulator:
         while not self._stop_event.is_set():
             with self._lock:
                 self._patrol_tick_locked()
+                self._disturb_obstacles_locked()
             time.sleep(self._tick)
+
+    def _disturb_obstacles_locked(self) -> None:
+        """可选的动态障碍：每隔若干 tick 随机把一处障碍挪到相邻合法格。"""
+        if not self._dynamic_obstacles:
+            return
+        self._obstacle_tick += 1
+        if self._obstacle_tick % 3 != 0:
+            return
+        obstacles = list(self._world.obstacles)
+        if not obstacles:
+            return
+        src = random.choice(obstacles)
+        candidates = []
+        for dx, dy in DIRECTIONS.values():
+            nxt = Position(src.x + dx, src.y + dy)
+            if not self._world.in_bounds(nxt):
+                continue
+            if nxt == self._world.start or nxt in self._world.checkpoints:
+                continue
+            if nxt == self._robot_pos or nxt in self._world.obstacles:
+                continue
+            candidates.append(nxt)
+        if not candidates:
+            return
+        dst = random.choice(candidates)
+        self._world.remove_obstacle(src)
+        self._world.add_obstacle(dst)
 
     def _patrol_tick_locked(self) -> None:
         if not self._patrol_active:
             return
 
-        # 1. 沿已规划路径前进一步。
+        # 1. 沿已规划路径前进一步；被新障碍截断时丢弃旧路径，稍后重新规划。
         if self._patrol_path:
             nxt = self._patrol_path.pop(0)
             if not self._world.passable(nxt):
+                self._patrol_path = []
+            else:
+                self._robot_dir = _direction_between(self._robot_pos, nxt)
+                self._robot_pos = nxt
+                self._robot_status = "moving"
+                self._record_checkpoint(nxt)
+                self._steps += 1
+                self._touch_clock()
+                return
+
+        # 2. 返航阶段：规划回到起点，到达后结束。
+        if self._returning:
+            if self._robot_pos == self._world.start:
+                self._patrol_active = False
+                self._patrol_completed = True
+                self._robot_status = "idle"
+                self._patrol_message = "巡检完成：已全部到达并返回起点"
+                return
+            path = planner.plan(self._world, self._robot_pos, self._world.start)
+            if path is None:
                 self._patrol_active = False
                 self._robot_status = "error"
-                self._patrol_message = "路径受阻，巡检已停止"
+                self._patrol_message = "返航路径受阻，巡检已停止"
                 return
-            self._robot_dir = _direction_between(self._robot_pos, nxt)
-            self._robot_pos = nxt
-            self._robot_status = "moving"
-            self._record_checkpoint(nxt)
-            self._refresh_patrol_locked()
+            self._patrol_target = self._world.start
+            self._patrol_path = path[1:]
             return
 
-        # 2. 路径走完，规划到下一个未访问的检查点。
+        # 3. 检查点全部走完后转入返航；否则规划到下一个未访问检查点。
         target = next((c for c in self._world.checkpoints if c not in self._visited), None)
         if target is None:
-            self._patrol_active = False
-            self._patrol_completed = True
-            self._robot_status = "idle"
-            self._patrol_message = "巡检完成：全部检查点均已到达"
+            self._returning = True
+            self._patrol_message = "检查点已全部到达，正在返航…"
+            path = planner.plan(self._world, self._robot_pos, self._world.start)
+            if path is None:
+                self._patrol_active = False
+                self._robot_status = "error"
+                self._patrol_message = "返航路径受阻，巡检已停止"
+                return
+            self._patrol_target = self._world.start
+            self._patrol_path = path[1:]
             return
 
         path = planner.plan(self._world, self._robot_pos, target)
@@ -207,17 +331,11 @@ class Simulator:
         if pos in self._world.checkpoints and pos not in self._visited:
             self._visited.append(pos)
 
-    def _refresh_patrol_locked(self) -> None:
-        if len(self._visited) == len(self._world.checkpoints):
-            self._patrol_active = False
-            self._patrol_completed = True
-            self._robot_status = "idle"
-            self._patrol_message = "巡检完成：全部检查点均已到达"
-
     def _stop_patrol_locked(self) -> None:
         self._patrol_active = False
         self._patrol_path = []
         self._patrol_target = None
+        self._returning = False
 
     def close(self) -> None:
         """服务关闭时结束后台线程。"""

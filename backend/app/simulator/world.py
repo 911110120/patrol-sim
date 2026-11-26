@@ -66,6 +66,27 @@ class World:
     def passable(self, point: Position) -> bool:
         return self.in_bounds(point) and point not in self.obstacles
 
+    def add_obstacle(self, point: Position) -> None:
+        """在指定格放置障碍；非法位置抛出 ValueError。"""
+        if not self.in_bounds(point):
+            raise ValueError(f"障碍物 {point} 超出地图边界")
+        if point == self.start:
+            raise ValueError("起点不能放置障碍物")
+        if point in self.checkpoints:
+            raise ValueError("检查点不能放置障碍物")
+        self.obstacles.add(point)
+
+    def remove_obstacle(self, point: Position) -> None:
+        self.obstacles.discard(point)
+
+    def toggle_obstacle(self, point: Position) -> bool:
+        """切换障碍状态，切换后返回该格是否为障碍。"""
+        if point in self.obstacles:
+            self.remove_obstacle(point)
+            return False
+        self.add_obstacle(point)
+        return True
+
     def to_dict(self) -> dict:
         return {
             "width": self.width,

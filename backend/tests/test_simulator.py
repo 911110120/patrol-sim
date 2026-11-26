@@ -122,3 +122,47 @@ def test_reset_restores_initial_state(sim: Simulator):
     assert state["robot"]["x"] == 0
     assert state["robot"]["y"] == 0
     assert state["patrol"]["visited"] == []
+
+
+def test_stats_start_at_zero(sim: Simulator):
+    stats = sim.state()["stats"]
+    assert stats["steps"] == 0
+    assert stats["pathLength"] == 0
+    assert stats["elapsed"] == 0.0
+    assert stats["coverage"] == 0.0
+
+
+def test_move_increments_steps(sim: Simulator):
+    sim.move("right")
+    assert sim.state()["stats"]["steps"] == 1
+
+
+def test_return_home_sets_returning_flag(sim: Simulator):
+    sim.move("right")
+    sim.move("down")
+    snap = sim.return_home()
+    assert snap["patrol"]["active"] is True
+    assert snap["patrol"]["returning"] is True
+
+
+def test_toggle_obstacle_blocks_protected_cells(sim: Simulator):
+    with pytest.raises(SimError):
+        sim.toggle_obstacle(0, 0)  # 起点
+    with pytest.raises(SimError):
+        sim.toggle_obstacle(2, 1)  # 检查点
+    snap = sim.toggle_obstacle(5, 5)
+    obstacles = {(o["x"], o["y"]) for o in snap["map"]["obstacles"]}
+    assert (5, 5) in obstacles
+
+
+def test_patrol_completes_and_returns_home(sim: Simulator):
+    sim.patrol_start()
+    deadline = time.time() + 5
+    state = sim.state()
+    while time.time() < deadline:
+        state = sim.state()
+        if state["patrol"]["completed"]:
+            break
+        time.sleep(0.02)
+    assert state["patrol"]["completed"] is True
+    assert (state["robot"]["x"], state["robot"]["y"]) == (0, 0)

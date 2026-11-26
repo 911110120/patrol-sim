@@ -47,6 +47,12 @@ const View = (() => {
       document.querySelector("#sensor-reading").textContent = `前方通畅（可通行 ${sensor.distance} 格）`;
     }
 
+    const stats = state.stats || {};
+    document.querySelector("#stat-steps").textContent = stats.steps ?? 0;
+    document.querySelector("#stat-path").textContent = stats.pathLength ?? 0;
+    document.querySelector("#stat-elapsed").textContent = `${Number(stats.elapsed || 0).toFixed(1)}s`;
+    document.querySelector("#stat-coverage").textContent = `${Math.round(Number(stats.coverage || 0) * 100)}%`;
+
     const progress = document.querySelector("#patrol-progress");
     if (state.patrol.completed) {
       progress.textContent = `巡检完成：${state.map.checkpoints.length} 个检查点全部经过。`;

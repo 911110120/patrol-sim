@@ -25,6 +25,10 @@ class PlanRequest(BaseModel):
     start: Point | None = None
 
 
+class DynamicObstacleRequest(BaseModel):
+    enabled: bool
+
+
 def create_router(sim: Simulator) -> APIRouter:
     router = APIRouter()
 
@@ -67,6 +71,21 @@ def create_router(sim: Simulator) -> APIRouter:
     @router.post("/api/reset")
     def reset() -> dict:
         return sim.reset()
+
+    @router.post("/api/return-home")
+    def return_home() -> dict:
+        return sim.return_home()
+
+    @router.post("/api/map/toggle", response_model=None)
+    def toggle_obstacle(req: Point):
+        try:
+            return sim.toggle_obstacle(req.x, req.y)
+        except SimError as err:
+            return _error(err.http_status, err.code, err.message)
+
+    @router.post("/api/map/dynamic")
+    def set_dynamic(req: DynamicObstacleRequest) -> dict:
+        return sim.set_dynamic_obstacles(req.enabled)
 
     return router
 
