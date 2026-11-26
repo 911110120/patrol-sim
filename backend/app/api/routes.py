@@ -28,6 +28,10 @@ class PlanRequest(BaseModel):
 def create_router(sim: Simulator) -> APIRouter:
     router = APIRouter()
 
+    @router.get("/api/health")
+    def health() -> dict:
+        return {"status": "ok"}
+
     @router.get("/api/state")
     def get_state() -> dict:
         return sim.state()
