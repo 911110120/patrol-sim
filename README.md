@@ -1,0 +1,66 @@
+# 基于 Web 的智能巡检机器人二维仿真系统
+
+## 在线演示
+
+> 部署可操作的在线演示后，把实际访问地址填在这里，方便访客直接体验。
+
+- 在线演示：`待部署后补充`
+
+## 项目简介
+
+本项目是结课作品：把机器人巡检场景搬到浏览器中，用二维网格地图展示机器人如何移动，以及位置、朝向和运行状态如何随操作变化。访客可以查看地图、手动控制机器人、查询两点间的规划路径、查看前方传感器读数，并启动自动巡检依次到达全部检查点。
+
+## 能做什么
+
+- **二维地图**：12×10 网格，区分空地、障碍物、检查点与机器人，支持坐标轴对照。
+- **手动控制**：方向按钮或键盘（方向键 / WASD）控制机器人每次移动一格；越界、撞墙时后端拒绝并保持位置不变。
+- **状态反馈**：实时显示坐标、朝向、运行状态与前方传感器读数，页面与 API 返回一致。
+- **路径规划**：点击空地格子，A* 算法生成绕开障碍物的可通行路径；目标不可达时返回原因。
+- **虚拟传感器**：沿当前朝向扫描前方，反馈是否受阻、阻挡来源（障碍 / 边界）与可通行距离。
+- **自动巡检**：一键启动，机器人按检查点顺序沿规划路径依次到达，进度与完成状态实时可见；可随时停止或复位。
+
+## 技术选型
+
+- 后端：Python 3.13 · FastAPI · Uvicorn
+- 前端：原生 HTML / CSS / JavaScript（无构建步骤）
+- 仿真：纯 Python 内存状态，`threading.Lock` 并发保护
+- CI：GitHub Actions 运行 pytest 与编译检查
+- 部署：单容器 Docker（非 root 运行），同时提供页面与 API
+
+## 快速启动
+
+### 本地运行
+
+```powershell
+python -m venv .venv
+.venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python -m uvicorn app.main:app --app-dir backend --port 8000
+```
+
+浏览器打开 `http://localhost:8000`。
+
+### Docker 运行
+
+```powershell
+docker build -t patrol-sim:local .
+docker run --rm -p 127.0.0.1:8080:8000 patrol-sim:local
+```
+
+打开 `http://localhost:8080`。
+
+## 测试与检查
+
+```powershell
+pytest backend
+python -m compileall -q backend/app
+```
+
+## 项目文档
+
+- [项目需求与实现范围](docs/01_项目需求.md)
+- [个人分工](docs/02_小组分工.md)
+- [项目架构与接口](docs/03_项目架构与接口.md)
+- [运行与结业提交](docs/04_运行与结业提交.md)
+- [部署报名与公网验收](docs/05_部署报名与公网验收.md)
+- [后端说明](backend/README.md)
+- [前端说明](frontend/README.md)
