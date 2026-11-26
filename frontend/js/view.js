@@ -84,10 +84,13 @@ const View = (() => {
         if (obstacleSet.has(`${x},${y}`)) {
           cell.classList.add("obstacle");
           cell.textContent = "障";
+        } else {
+          cell.classList.add("passable");
         }
         const checkpointIndex = checkpoints.findIndex((p) => p.x === x && p.y === y);
         if (checkpointIndex !== -1) {
           cell.classList.add("checkpoint");
+          if (visitedSet.has(`${x},${y}`)) cell.classList.add("visited");
           cell.textContent = visitedSet.has(`${x},${y}`) ? "已" : `点${checkpointIndex + 1}`;
         }
         if (pathSet.has(`${x},${y}`) && !obstacleSet.has(`${x},${y}`)) {
